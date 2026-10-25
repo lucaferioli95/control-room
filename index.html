@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Control Room</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0B5FA5">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: summary chips on top, project list on the left, one project's detail on the right; stacks on phones. */
@@ -144,7 +148,7 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
       <p class="eyebrow">Luca's workshop</p>
       <h1>Control Room</h1>
     </div>
-    <div class="meta" id="meta"></div>
+    <div class="meta"><div id="meta"></div><button class="btn" id="installbtn" type="button" hidden style="margin-top:8px">Install app</button></div>
   </header>
   <div id="banner"></div>
   <div class="usage" id="usage" hidden>
@@ -452,6 +456,13 @@ function localDb(){
       subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}}}
   };
 }
+
+/* ---------- install as app ---------- */
+if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0){navigator.serviceWorker.register("sw.js").catch(function(){})}
+var installEvt=null;
+window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installEvt=e;$("#installbtn").hidden=false});
+window.addEventListener("appinstalled",function(){installEvt=null;$("#installbtn").hidden=true;toast("Installed.")});
+$("#installbtn").addEventListener("click",function(){if(!installEvt)return;installEvt.prompt();installEvt.userChoice.finally(function(){installEvt=null;$("#installbtn").hidden=true})});
 
 /* ---------- boot ---------- */
 render(true);
