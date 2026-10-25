@@ -43,6 +43,7 @@
   color-scheme:dark}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;
   padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
@@ -132,6 +133,8 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
 .u-field{display:flex;align-items:center;gap:6px;font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .u-field input{width:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink)}
 .u-field input[type=number]{width:70px}
+.logincard{max-width:380px;margin:12vh auto 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.logincard h1{margin:0;font-size:32px}
 @media (max-width:820px){
   .grid{grid-template-columns:minmax(0,1fr)}
   .listcol{position:static;max-height:none}
@@ -142,13 +145,19 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 </head><body>
-<div class="wrap">
+<div id="login" hidden class="logincard">
+  <h1>Control Room</h1>
+  <p id="login-msg" class="hint"></p>
+  <button class="btn primary" id="login-btn" type="button">Sign in with Google</button>
+  <button class="btn" id="login-out" type="button" hidden>Sign out</button>
+</div>
+<div class="wrap" hidden>
   <header class="top">
     <div>
       <p class="eyebrow">Luca's workshop</p>
       <h1>Control Room</h1>
     </div>
-    <div class="meta"><div id="meta"></div><button class="btn" id="installbtn" type="button" hidden style="margin-top:8px">Install app</button></div>
+    <div class="meta"><div id="meta"></div><button class="btn" id="signout" type="button" hidden style="margin-top:8px">Sign out</button> <button class="btn" id="installbtn" type="button" hidden style="margin-top:8px">Install app</button></div>
   </header>
   <div id="banner"></div>
   <div class="usage" id="usage" hidden>
@@ -173,6 +182,7 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
 </div>
 <div id="toast" role="status"></div>
 
+<script src="supabase.js"></script>
 <script>
 (function(){
 var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs review"],["live","Live"],["paused","Paused"],["done","Done"]];
@@ -424,37 +434,49 @@ $("#u-reset").addEventListener("change",saveUsage);
 setInterval(tickUsage,30000);
 
 
-/* ---------- local storage backend (replaces the claude.ai database) ---------- */
-var SEED={
- "family-planner":{name:"Family Planner",kind:"app",status:"live",order:1,chatUrl:"",summary:"Family meal planning web app on Netlify with Supabase, installable as a PWA. Weekly planner, recipe library, shopping list and nutrition tracking. Google sign-in with an allow-list, Gemini recipe import, USDA lookup, recipe photos in Supabase Storage and a nightly backup are all in place.",nextSteps:[{id:"fp1",text:"Keep the recipe export readable by Ricettario",done:false}],notes:[]},
- "ricettario":{name:"Ricettario",kind:"app",status:"live",order:2,chatUrl:"",summary:"Simple Italian recipe app for another family: recipes and servings scaling only, no nutrition or planning. Own Supabase project and Netlify site, no sign-in. It has to import recipe files exported from the Family Planner.",nextSteps:[{id:"ri1",text:"Check that an exported Family Planner recipe file imports correctly",done:false},{id:"ri2",text:"Check that the whole app is in Italian",done:false}],notes:[]},
- "yoga-class-planner":{name:"Yoga class planner",kind:"app",status:"building",order:3,chatUrl:"",summary:"Personal Tummee-style tool for planning your yoga classes. Drawn SVG pose figures first (about 50 poses), as a website app so later changes update it. Class building is the priority.",nextSteps:[{id:"yo1",text:"Build the class builder",done:false},{id:"yo2",text:"Draw the first set of about 50 SVG pose figures",done:false},{id:"yo3",text:"Put it on a website so changes update the live version",done:false}],notes:[]},
- "lesson-board":{name:"Lesson tracking board",kind:"tool",status:"building",order:4,chatUrl:"",summary:"Shared web board to follow each lesson video through recording, editing, review and storage. Steps run in a fixed order with owners, due dates, done-by stamps and Drive/YouTube links. Test on localhost first, then host on Netlify.",nextSteps:[{id:"lb1",text:"Test the board on localhost",done:false},{id:"lb2",text:"Host it on Netlify",done:false},{id:"lb3",text:"Try audio-only samples for automatic start and end trimming",done:false}],notes:[]},
- "kagebana":{name:"Kagebana",kind:"game",status:"planning",order:5,chatUrl:"",summary:"Hades-style isometric action roguelike set in Sengoku-era Japan. About 20 minute runs across three biomes, a few weapons with random boons, parry timing windows, and Steam Deck as the target. Gameplay only, built slowly with no rush.",nextSteps:[{id:"ka1",text:"Decide how the first playable room gets built",done:false},{id:"ka2",text:"Prototype combat with good and perfect parry timing",done:false}],notes:[]},
- "lifeframe":{name:"LifeFrame",kind:"app",status:"review",order:6,chatUrl:"",summary:"Photography e-commerce platform built with React and Supabase. Not much recorded about where it stands, so set the real status here.",nextSteps:[{id:"lf1",text:"Write down where LifeFrame stands and what comes next",done:false}],notes:[]},
- "room-repaint":{name:"Room repaint",kind:"home",status:"planning",order:7,chatUrl:"",summary:"Two pink shades split by a wavy line, no white paint, plus white daisy stickers on the upper part of the long wall only. Swatches considered: Brut Rosé R48B, Rose Sugar R45C, Tutu R45B.",nextSteps:[{id:"rr1",text:"Choose the two pinks",done:false},{id:"rr2",text:"Order the white daisy stickers",done:false}],notes:[]}
-};
-function localDb(){
-  var KEY="control-room-v1",mem=null,subs=[];
-  function load(){
-    if(mem)return mem;
-    try{var r=localStorage.getItem(KEY);if(r)mem=JSON.parse(r)}catch(e){}
-    if(!mem){mem={};Object.keys(SEED).forEach(function(k){mem["projects/"+k]=Object.assign({updatedAt:Date.now()},SEED[k])})}
-    return mem;
+/* ---------- Supabase backend (shared across devices) ---------- */
+var SB_URL="https://jsddqdmaatosqvbdrzjo.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzZGRxZG1hYXRvc3F2YmRyempvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0OTkwMTEsImV4cCI6MjEwMzA3NTAxMX0.sHI2j5w3xjRJhkD9EUqU2l1ZxgW164DqyIdEyGGgAXs"; /* public anon key: safe to publish, row-level security protects the data */
+var TABLE="control_room_docs";
+function supaDb(sb){
+  var cache=new Map(),subs=[],ready=false,queues={};
+  function emit(){subs.forEach(function(f){f()})}
+  function snap(path){return{id:path.split("/").pop(),exists:cache.has(path),data:function(){return cache.get(path)}}}
+  function put(path,value){
+    cache.set(path,value);emit();
+    var prev=queues[path]||Promise.resolve();
+    var run=prev.then(function(){return sb.from(TABLE).upsert({id:path,value:value,updated_at:new Date().toISOString()})}).then(function(r){if(r.error)throw r.error});
+    queues[path]=run.catch(function(){});
+    return run;
   }
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify(mem))}catch(e){}subs.forEach(function(f){f()})}
-  function snap(path){var d=load()[path];return{id:path.split("/").pop(),exists:!!d,data:function(){return d}}}
-  return{
+  var db={
+    start:async function(){
+      var r=await sb.from(TABLE).select("id,value");
+      if(r.error)throw r.error;
+      cache=new Map(r.data.map(function(x){return[x.id,x.value]}));ready=true;emit();
+      sb.channel("cr-docs").on("postgres_changes",{event:"*",schema:"public",table:TABLE},function(p){
+        if(p.eventType==="DELETE")cache.delete(p.old.id);else cache.set(p.new.id,p.new.value);
+        emit();
+      }).subscribe();
+    },
     doc:function(path){return{
-      set:function(d){load()[path]=d;persist();return Promise.resolve()},
-      update:function(d){var m=load();m[path]=Object.assign({},m[path]||{},d);persist();return Promise.resolve()},
-      delete:function(){delete load()[path];persist();return Promise.resolve()},
-      onSnapshot:function(next){var f=function(){next(snap(path))};subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}
+      set:function(d){return put(path,d)},
+      update:function(d){return put(path,Object.assign({},cache.get(path)||{},d))},
+      delete:function(){cache.delete(path);emit();return sb.from(TABLE).delete().eq("id",path).then(function(r){if(r.error)throw r.error})},
+      onSnapshot:function(next){var f=function(){if(ready)next(snap(path))};subs.push(f);f();return function(){subs=subs.filter(function(x){return x!==f})}}
     }},
     collection:function(name){return{onSnapshot:function(next){
-      var f=function(){var m=load(),docs=Object.keys(m).filter(function(k){return k.indexOf(name+"/")===0&&k.split("/").length===2}).map(snap);next({docs:docs})};
-      subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}}}
+      var f=function(){if(!ready)return;next({docs:Array.from(cache.keys()).filter(function(k){return k.indexOf(name+"/")===0&&k.split("/").length===2}).map(snap)})};
+      subs.push(f);f();return function(){subs=subs.filter(function(x){return x!==f})}}}}
   };
+  return db;
+}
+function showLogin(msg,allowSignIn){
+  document.querySelector(".wrap").hidden=true;
+  var l=$("#login");l.hidden=false;
+  $("#login-msg").textContent=msg||"Sign in with Google to open your board.";
+  $("#login-btn").hidden=!allowSignIn;
+  $("#login-out").hidden=allowSignIn;
 }
 
 /* ---------- install as app ---------- */
@@ -467,8 +489,24 @@ $("#installbtn").addEventListener("click",function(){if(!installEvt)return;insta
 /* ---------- boot ---------- */
 render(true);
 (async function(){
-  db=localDb();
-  if(!db){loaded=true;dbMissing=true;render(true);return}
+  var sb=null;
+  if(window.supabase&&window.supabase.createClient){
+    sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,detectSessionInUrl:true,flowType:"pkce"}});
+  }
+  if(!sb){loaded=true;dbMissing=true;showLogin("The sync library did not load. Check your connection and reload.",false);$("#login-out").hidden=true;return}
+  $("#login-btn").addEventListener("click",function(){
+    sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+  });
+  $("#login-out").addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload()})});
+  $("#signout").addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload()})});
+  var sess=(await sb.auth.getSession()).data.session;
+  if(!sess){showLogin("",true);return}
+  var ok=await sb.rpc("is_control_room_member");
+  if(ok.error||ok.data!==true){showLogin("This Google account ("+(sess.user.email||"unknown")+") is not on the Control Room list.",false);return}
+  document.querySelector(".wrap").hidden=false;
+  $("#signout").hidden=false;
+  db=supaDb(sb);
+  try{await db.start()}catch(e){loaded=true;dbMissing=true;$("#banner").append(h("div",{class:"banner",text:"Could not load your board. Check your connection and reload."}));render(true);return}
   $("#usage").hidden=false;
   if(!canWrite)$("#usage").querySelectorAll(".w").forEach(function(el){el.disabled=true});
   tickUsage();
