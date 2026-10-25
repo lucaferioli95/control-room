@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Room</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: summary chips on top, project list on the left, one project's detail on the right; stacks on phones. */
+:root{
+  --bg:#EEF0F2; --surface:#FFFFFF; --surface-2:#E4E8EC; --ink:#14202B; --muted:#566473; --line:#CBD3DB;
+  --accent:#0B5FA5; --accent-ink:#FFFFFF; --danger:#9B2A1F;
+  --st-planning-bg:#E3E0F5; --st-planning-fg:#3B3380;
+  --st-building-bg:#FBE8C2; --st-building-fg:#7A4A00;
+  --st-review-bg:#F9D6D2;   --st-review-fg:#8A2118;
+  --st-live-bg:#CDEBD5;     --st-live-fg:#1B5E34;
+  --st-paused-bg:#DDE1E6;   --st-paused-fg:#46515C;
+  --st-done-bg:#D0E6EA;     --st-done-fg:#1D5560;
+  --font-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1720; --surface:#17212C; --surface-2:#1F2B38; --ink:#E6ECF2; --muted:#93A2B1; --line:#2C3947;
+  --accent:#5AA7E8; --accent-ink:#0B1620; --danger:#F08C80;
+  --st-planning-bg:#2B2851; --st-planning-fg:#C3BDF2;
+  --st-building-bg:#4A3510; --st-building-fg:#F2C879;
+  --st-review-bg:#4D1E1A;   --st-review-fg:#F5B3AB;
+  --st-live-bg:#16402A;     --st-live-fg:#9FDDB3;
+  --st-paused-bg:#2A333D;   --st-paused-fg:#A9B5C1;
+  --st-done-bg:#16393F;     --st-done-fg:#9AD0D8;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1720; --surface:#17212C; --surface-2:#1F2B38; --ink:#E6ECF2; --muted:#93A2B1; --line:#2C3947;
+  --accent:#5AA7E8; --accent-ink:#0B1620; --danger:#F08C80;
+  --st-planning-bg:#2B2851; --st-planning-fg:#C3BDF2;
+  --st-building-bg:#4A3510; --st-building-fg:#F2C879;
+  --st-review-bg:#4D1E1A;   --st-review-fg:#F5B3AB;
+  --st-live-bg:#16402A;     --st-live-fg:#9FDDB3;
+  --st-paused-bg:#2A333D;   --st-paused-fg:#A9B5C1;
+  --st-done-bg:#16393F;     --st-done-fg:#9AD0D8;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.eyebrow{margin:0;font:500 12px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{margin:8px 0 0;font:800 clamp(30px,5vw,44px)/1 var(--font-display);letter-spacing:-.02em;text-wrap:balance}
+.meta{font:400 13px/1.5 var(--font-mono);color:var(--muted);text-align:right}
+.meta b{color:var(--ink);font-weight:500}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;cursor:pointer;display:inline-flex;gap:8px;align-items:center;font-weight:500;font-size:14px}
+.chip .n{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] .n{color:var(--bg);opacity:.75}
+
+.grid{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:20px;align-items:start}
+.listcol{display:flex;flex-direction:column;gap:12px;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;min-width:0}
+.listhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.listhead h2{margin:0;font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+#list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.row{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-width:0}
+.row:hover{border-color:var(--muted)}
+.row[aria-current="true"]{background:var(--surface-2);border-color:var(--ink)}
+.row .line1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row .name{font:700 16px/1.2 var(--font-display);min-width:0;overflow-wrap:anywhere}
+.row .next{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.row .badges{display:flex;gap:10px;font:400 12px var(--font-mono);color:var(--muted)}
+
+.pill{font:500 11px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:6px;white-space:nowrap;flex:none}
+.pill[data-st="planning"]{background:var(--st-planning-bg);color:var(--st-planning-fg)}
+.pill[data-st="building"]{background:var(--st-building-bg);color:var(--st-building-fg)}
+.pill[data-st="review"]{background:var(--st-review-bg);color:var(--st-review-fg)}
+.pill[data-st="live"]{background:var(--st-live-bg);color:var(--st-live-fg)}
+.pill[data-st="paused"]{background:var(--st-paused-bg);color:var(--st-paused-fg)}
+.pill[data-st="done"]{background:var(--st-done-bg);color:var(--st-done-fg)}
+
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:24px;min-width:0}
+.dhead{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.dhead .titlebox{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.kind{font:500 11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.nameinput{width:100%;border:1px solid transparent;background:transparent;border-radius:8px;padding:4px 8px;margin-left:-8px;font:800 28px/1.15 var(--font-display);letter-spacing:-.01em}
+.nameinput:hover{border-color:var(--line)}
+.statuswrap{display:flex;flex-direction:column;gap:4px;font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+select,input[type=text],input[type=url],textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+select{width:auto;min-width:150px;font-size:14px;text-transform:none;letter-spacing:0;color:var(--ink)}
+textarea{resize:vertical;min-height:84px;line-height:1.5}
+section.block{display:flex;flex-direction:column;gap:10px;min-width:0}
+section.block>h3{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.item{display:flex;align-items:flex-start;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.item.done .t{color:var(--muted);text-decoration:line-through}
+.check{flex:none;width:20px;height:20px;margin-top:2px;border:1.5px solid var(--muted);border-radius:5px;background:var(--bg);cursor:pointer;padding:0;display:grid;place-items:center}
+.check[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
+.check[aria-checked="true"]::after{content:"";width:9px;height:5px;border-left:2px solid var(--accent-ink);border-bottom:2px solid var(--accent-ink);transform:rotate(-45deg) translate(1px,-1px)}
+.x{flex:none;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:0 6px;border-radius:6px}
+.x:hover{color:var(--danger)}
+.addrow{display:flex;gap:8px}
+.addrow input{flex:1;min-width:0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500;font-size:14px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--ink);white-space:nowrap}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger)}
+.btn[disabled],input[disabled],textarea[disabled],select[disabled]{opacity:.55;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.chatrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chatrow input{flex:1 1 240px;min-width:0}
+.footrow{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--line)}
+.stamp{font:400 12px var(--font-mono);color:var(--muted)}
+.empty{padding:36px 8px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty strong{font:700 18px var(--font-display);color:var(--ink)}
+.banner{background:var(--st-building-bg);color:var(--st-building-fg);border-radius:8px;padding:10px 14px;font-size:14px}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .15s;max-width:calc(100vw - 32px);z-index:20}
+#toast.show{opacity:1}
+.usage{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.u-label{font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.u-meter{flex:0 0 140px;height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+#u-fill{height:100%;width:0;border-radius:999px;background:var(--st-live-fg)}
+#u-fill[data-level="mid"]{background:var(--st-building-fg)}
+#u-fill[data-level="low"]{background:var(--st-review-fg)}
+.u-text{flex:1 1 220px;min-width:0;font:500 13px/1.4 var(--font-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.u-field{display:flex;align-items:center;gap:6px;font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.u-field input{width:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink)}
+.u-field input[type=number]{width:70px}
+@media (max-width:820px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .listcol{position:static;max-height:none}
+  .meta{text-align:left}
+  .detail{padding:16px}
+  .nameinput{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Luca's workshop</p>
+      <h1>Control Room</h1>
+    </div>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div id="banner"></div>
+  <div class="usage" id="usage" hidden>
+    <span class="u-label">Claude usage</span>
+    <div class="u-meter" aria-hidden="true"><div id="u-fill"></div></div>
+    <span class="u-text" id="u-text"></span>
+    <label class="u-field">Left %<input id="u-pct" class="w" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
+    <label class="u-field">Resets<input id="u-reset" class="w" type="datetime-local"></label>
+  </div>
+  <nav class="chips" id="chips" aria-label="Filter by status"></nav>
+  <main class="grid">
+    <section class="listcol" aria-label="Projects">
+      <div class="listhead"><h2>Projects</h2><button class="btn" id="addbtn" type="button">+ Add project</button></div>
+      <div id="addform" hidden class="addrow">
+        <input type="text" id="newname" placeholder="Project name" aria-label="New project name" maxlength="80">
+        <button class="btn primary" id="newok" type="button">Add</button>
+      </div>
+      <ul id="list"></ul>
+    </section>
+    <section class="detail" id="detail" aria-live="polite"></section>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs review"],["live","Live"],["paused","Paused"],["done","Done"]];
+var KINDS={app:"App",game:"Game",tool:"Tool",home:"Home",work:"Work",other:"Project"};
+var $=function(s){return document.querySelector(s)};
+var db=null,canWrite=true,loaded=false,dbMissing=false;
+var projects=new Map(),selected=null,filter="all",armedDelete=false,drafts={},fallbackText="";
+var queues=new Map();
+
+function h(tag,props){
+  var el=document.createElement(tag),kids=Array.prototype.slice.call(arguments,2);
+  Object.keys(props||{}).forEach(function(k){
+    var v=props[k]; if(v==null||v===false)return;
+    if(k==="class")el.className=v;
+    else if(k==="text")el.textContent=v;
+    else if(k==="value")el.value=v;
+    else if(k.slice(0,2)==="on")el.addEventListener(k.slice(2),v);
+    else if(v===true)el.setAttribute(k,"");
+    else el.setAttribute(k,v);
+  });
+  kids.forEach(function(kid){
+    if(Array.isArray(kid))kid.forEach(function(x){if(x!=null&&x!==false)el.append(x.nodeType?x:document.createTextNode(x))});
+    else if(kid!=null&&kid!==false)el.append(kid.nodeType?kid:document.createTextNode(kid));
+  });
+  return el;
+}
+function uid(){return Math.random().toString(36).slice(2,8)+Date.now().toString(36)}
+function safeUrl(u){try{var x=new URL(String(u||"").trim());return(x.protocol==="https:"||x.protocol==="http:")?x.href:null}catch(e){return null}}
+function stLabel(s){var f=STATUSES.filter(function(x){return x[0]===s})[0];return f?f[1]:"Planning"}
+function fmtDate(ts){if(!ts)return"";return new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}
+var toastTimer;
+function toast(msg){var t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove("show")},2600)}
+
+function sorted(){
+  return Array.from(projects.entries()).map(function(e){return Object.assign({id:e[0]},e[1])})
+    .sort(function(a,b){return(a.order||0)-(b.order||0)||String(a.name||"").localeCompare(String(b.name||""))});
+}
+function openSteps(p){return(p.nextSteps||[]).filter(function(s){return!s.done})}
+function openNotes(p){return(p.notes||[]).filter(function(s){return!s.done})}
+
+/* ---------- writes ---------- */
+function save(id,patch){
+  var p=projects.get(id); if(!p)return;
+  var stamp=Date.now();
+  projects.set(id,Object.assign({},p,patch,{updatedAt:stamp}));
+  if(!db)return;
+  var body=Object.assign({},patch,{updatedAt:stamp});
+  var prev=queues.get(id)||Promise.resolve();
+  var run=prev.then(function(){return db.doc("projects/"+id).update(body)}).catch(function(e){
+    toast(e&&e.code==="invalid_argument"?"You can view this page but not change it.":"Could not save. Try again in a moment.");
+  });
+  queues.set(id,run);
+}
+
+/* ---------- render ---------- */
+function render(forceDetail){
+  renderMeta();renderChips();renderList();
+  var a=document.activeElement,d=$("#detail");
+  var typing=a&&d.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  if(forceDetail||!typing)renderDetail();
+}
+function renderMeta(){
+  var all=sorted(),steps=0,notes=0;
+  all.forEach(function(p){steps+=openSteps(p).length;notes+=openNotes(p).length});
+  var m=$("#meta");m.replaceChildren();
+  if(!loaded){return}
+  m.append(h("div",{},h("b",{text:String(all.length)})," projects"),h("div",{},h("b",{text:String(steps)})," open steps · ",h("b",{text:String(notes)})," topics to discuss"));
+}
+function renderChips(){
+  var all=sorted(),c=$("#chips");c.replaceChildren();
+  if(!loaded||!all.length)return;
+  function chip(key,label,n){
+    c.append(h("button",{class:"chip",type:"button","aria-pressed":String(filter===key),onclick:function(){filter=key;render(true)}},label,h("span",{class:"n",text:String(n)})));
+  }
+  chip("all","All",all.length);
+  STATUSES.forEach(function(s){
+    var n=all.filter(function(p){return p.status===s[0]}).length;
+    if(n||filter===s[0])chip(s[0],s[1],n);
+  });
+}
+function renderList(){
+  var ul=$("#list");ul.replaceChildren();
+  var all=sorted().filter(function(p){return filter==="all"||p.status===filter});
+  if(selected&&!projects.has(selected))selected=null;
+  if(!selected||!all.some(function(p){return p.id===selected})){selected=all.length?all[0].id:null;armedDelete=false;drafts={}}
+  all.forEach(function(p){
+    var next=openSteps(p)[0],nn=openNotes(p).length;
+    ul.append(h("li",{},h("button",{class:"row",type:"button","aria-current":String(p.id===selected),onclick:function(){
+        if(selected!==p.id){selected=p.id;armedDelete=false;drafts={};fallbackText=""}
+        render(true);
+        if(window.matchMedia("(max-width:820px)").matches)$("#detail").scrollIntoView({block:"start"});
+      }},
+      h("span",{class:"line1"},h("span",{class:"name",text:p.name||"Untitled"}),h("span",{class:"pill","data-st":p.status||"planning",text:stLabel(p.status)})),
+      h("span",{class:"next",text:next?"Next: "+next.text:"No open steps"}),
+      h("span",{class:"badges"},h("span",{text:openSteps(p).length+" open"}),nn?h("span",{text:nn+" to discuss"}):null)
+    )));
+  });
+  if(loaded&&!all.length&&projects.size)ul.append(h("li",{class:"hint",text:"No projects with this status."}));
+}
+function renderDetail(){
+  var box=$("#detail");
+  var oldStep=document.getElementById("f-step"),oldNote=document.getElementById("f-note");
+  if(oldStep)drafts.step=oldStep.value; if(oldNote)drafts.note=oldNote.value;
+  box.replaceChildren();
+  if(!loaded){box.append(h("div",{class:"empty"},h("span",{text:dbMissing?"Saved data is not available in this view.":"Loading projects…"})));return}
+  var p=selected?projects.get(selected):null;
+  if(!p){
+    box.append(h("div",{class:"empty"},h("strong",{text:projects.size?"Pick a project":"No projects yet"}),
+      h("span",{text:projects.size?"Choose one from the list to see its status, steps and notes.":"Add your first project to start tracking status, next steps and topics to discuss."}),
+      projects.size?null:h("button",{class:"btn primary w",type:"button",onclick:function(){showAdd()}},"+ Add project")));
+    return;
+  }
+  var id=selected,steps=p.nextSteps||[],notes=p.notes||[];
+  var url=safeUrl(p.chatUrl);
+
+  var nameIn=h("input",{class:"nameinput w",id:"f-name",type:"text",value:p.name||"","aria-label":"Project name",maxlength:"80",onchange:function(e){var v=e.target.value.trim();if(v)save(id,{name:v});else e.target.value=p.name||"";render(false)}});
+  var sel=h("select",{id:"f-status",class:"w",onchange:function(e){save(id,{status:e.target.value});render(true)}},
+    STATUSES.map(function(s){return h("option",{value:s[0],selected:s[0]===p.status,text:s[1]})}));
+  var summary=h("textarea",{id:"f-summary",class:"w","aria-label":"Summary",placeholder:"Where does this stand in a few lines?",value:p.summary||"",onchange:function(e){save(id,{summary:e.target.value.trim()});render(false)}});
+
+  function addStep(){
+    var inp=document.getElementById("f-step"),v=inp.value.trim();if(!v)return;
+    save(id,{nextSteps:steps.concat([{id:uid(),text:v,done:false}])});drafts.step="";renderDetail();render(false);document.getElementById("f-step").focus();
+  }
+  function addNote(){
+    var inp=document.getElementById("f-note"),v=inp.value.trim();if(!v)return;
+    save(id,{notes:notes.concat([{id:uid(),text:v,done:false,ts:Date.now()}])});drafts.note="";renderDetail();render(false);document.getElementById("f-note").focus();
+  }
+  function copyTopics(btn){
+    var open=openNotes(p);
+    if(!open.length){toast("No open topics to copy.");return}
+    var txt="Topics to discuss: "+(p.name||"Project")+"\n"+(url?"Conversation: "+url+"\n":"")+open.map(function(n){return"- "+n.text}).join("\n");
+    var done=function(){toast("Copied. Paste it into the conversation.")};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,function(){fallbackText=txt;renderDetail();var f=document.getElementById("f-copybox");if(f){f.focus();f.select()}})}
+    else{fallbackText=txt;renderDetail();var f=document.getElementById("f-copybox");if(f){f.focus();f.select()}}
+  }
+
+  var doneCount=steps.length-openSteps(p).length;
+  box.append(
+    h("div",{class:"dhead"},
+      h("div",{class:"titlebox"},h("span",{class:"kind",text:KINDS[p.kind]||"Project"}),nameIn),
+      h("label",{class:"statuswrap"},"Status",sel)
+    ),
+    h("section",{class:"block"},h("h3",{},"Summary"),summary),
+
+    h("section",{class:"block"},
+      h("h3",{},"Next steps",h("span",{class:"count",text:steps.length?doneCount+" of "+steps.length+" done":""})),
+      steps.length?h("ul",{class:"items"},steps.map(function(s){
+        return h("li",{class:"item"+(s.done?" done":"")},
+          h("button",{class:"check w",type:"button",role:"checkbox","aria-checked":String(!!s.done),"aria-label":(s.done?"Mark open: ":"Mark done: ")+s.text,onclick:function(){
+            save(id,{nextSteps:steps.map(function(x){return x.id===s.id?Object.assign({},x,{done:!x.done}):x})});renderDetail();render(false)}}),
+          h("span",{class:"t",text:s.text}),
+          h("button",{class:"x w",type:"button","aria-label":"Remove step: "+s.text,onclick:function(){
+            save(id,{nextSteps:steps.filter(function(x){return x.id!==s.id})});renderDetail();render(false)}},"×"));
+      })):h("p",{class:"hint",text:"No steps yet. Add the next thing to do."}),
+      h("div",{class:"addrow"},
+        h("input",{type:"text",id:"f-step",class:"w",placeholder:"Add a next step",value:drafts.step||"","aria-label":"New next step",maxlength:"200",onkeydown:function(e){if(e.key==="Enter"){e.preventDefault();addStep()}}}),
+        h("button",{class:"btn w",type:"button",onclick:addStep},"Add"))
+    ),
+
+    h("section",{class:"block"},
+      h("h3",{},"Conversation"),
+      h("div",{class:"chatrow"},
+        h("input",{type:"url",id:"f-chat",class:"w",placeholder:"Paste the link to this project's conversation",value:p.chatUrl||"","aria-label":"Conversation link",onchange:function(e){
+          var raw=e.target.value.trim();
+          if(raw&&!safeUrl(raw)){toast("That is not a web link. Paste the full https:// address.");e.target.value=p.chatUrl||"";return}
+          save(id,{chatUrl:raw?safeUrl(raw):""});renderDetail();render(false)}}),
+        url?h("a",{class:"btn primary",href:url,target:"_blank",rel:"noopener noreferrer"},"Open conversation ↗"):null),
+      url?null:h("p",{class:"hint",text:"Open the conversation in Claude, copy its address from the browser, and paste it here."})
+    ),
+
+    h("section",{class:"block"},
+      h("h3",{},"To discuss",h("span",{class:"count",text:openNotes(p).length?openNotes(p).length+" open":""})),
+      notes.length?h("ul",{class:"items"},notes.map(function(n){
+        return h("li",{class:"item"+(n.done?" done":"")},
+          h("button",{class:"check w",type:"button",role:"checkbox","aria-checked":String(!!n.done),"aria-label":(n.done?"Mark open: ":"Mark discussed: ")+n.text,onclick:function(){
+            save(id,{notes:notes.map(function(x){return x.id===n.id?Object.assign({},x,{done:!x.done}):x})});renderDetail();render(false)}}),
+          h("span",{class:"t",text:n.text}),
+          h("button",{class:"x w",type:"button","aria-label":"Remove topic: "+n.text,onclick:function(){
+            save(id,{notes:notes.filter(function(x){return x.id!==n.id})});renderDetail();render(false)}},"×"));
+      })):h("p",{class:"hint",text:"Nothing queued. Write down what you want to raise next time."}),
+      h("textarea",{id:"f-note",class:"w","aria-label":"New topic to discuss",placeholder:"Write something to discuss…",value:drafts.note||"",style:"min-height:64px",onkeydown:function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();addNote()}}}),
+      h("div",{class:"addrow",style:"justify-content:flex-start;flex-wrap:wrap"},
+        h("button",{class:"btn primary w",type:"button",onclick:addNote},"Add topic"),
+        h("button",{class:"btn",type:"button",onclick:function(e){copyTopics(e.currentTarget)}},"Copy open topics")),
+      fallbackText?h("div",{class:"block"},h("p",{class:"hint",text:"Copying was blocked. Select the text below and copy it."}),h("textarea",{id:"f-copybox",readonly:true,value:fallbackText,style:"min-height:100px"})):null
+    ),
+
+    h("div",{class:"footrow"},
+      h("span",{class:"stamp",text:p.updatedAt?"Updated "+fmtDate(p.updatedAt):""}),
+      h("button",{class:"btn danger w",type:"button",onclick:function(){
+        if(!armedDelete){armedDelete=true;renderDetail();return}
+        armedDelete=false;
+        projects.delete(id);selected=null;render(true);
+        if(db)db.doc("projects/"+id).delete().catch(function(){toast("Could not delete. Try again.")});
+      }},armedDelete?"Click again to delete":"Delete project"))
+  );
+  if(!canWrite)box.querySelectorAll(".w").forEach(function(el){el.disabled=true});
+}
+
+/* ---------- add project ---------- */
+function showAdd(){var f=$("#addform");f.hidden=false;$("#newname").focus()}
+function createProject(){
+  var inp=$("#newname"),name=inp.value.trim();if(!name)return;
+  var id=uid(),order=sorted().reduce(function(m,p){return Math.max(m,p.order||0)},0)+1;
+  var doc={name:name,kind:"other",status:"planning",summary:"",nextSteps:[],notes:[],chatUrl:"",order:order,updatedAt:Date.now()};
+  projects.set(id,doc);selected=id;filter="all";loaded=true;inp.value="";$("#addform").hidden=true;armedDelete=false;drafts={};render(true);
+  if(db)db.doc("projects/"+id).set(doc).catch(function(){toast("Could not save the new project.")});
+}
+$("#addbtn").addEventListener("click",function(){var f=$("#addform");if(f.hidden)showAdd();else f.hidden=true});
+$("#newok").addEventListener("click",createProject);
+$("#newname").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();createProject()}});
+
+/* ---------- usage marker (typed in by hand; the page cannot read the real balance) ---------- */
+var usage=null,usageQ=Promise.resolve();
+function pad2(n){return String(n).padStart(2,"0")}
+function toLocalInput(ts){var d=new Date(ts);return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+"T"+pad2(d.getHours())+":"+pad2(d.getMinutes())}
+function fmtLeft(ms){var m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m"}
+function tickUsage(){
+  var pct=usage&&typeof usage.pct==="number"?usage.pct:null;
+  var at=usage&&usage.resetAt?new Date(usage.resetAt):null;
+  var fill=$("#u-fill");
+  fill.style.width=(pct==null?0:Math.min(100,Math.max(0,pct)))+"%";
+  fill.setAttribute("data-level",pct==null?"":(pct<10?"low":pct<30?"mid":"ok"));
+  var parts=[pct==null?"Credit left not set":pct+"% left"];
+  if(at&&!isNaN(at.getTime())){
+    var ms=at.getTime()-Date.now();
+    parts.push(ms>0?"resets in "+fmtLeft(ms)+" ("+at.toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+")":"reset time has passed, update it");
+  }else parts.push("next reset not set");
+  if(usage&&usage.updatedAt)parts.push("entered "+fmtDate(usage.updatedAt));
+  $("#u-text").textContent=parts.join(" · ");
+}
+function syncUsageInputs(){
+  var a=document.activeElement,p=$("#u-pct"),r=$("#u-reset");
+  if(a!==p)p.value=usage&&typeof usage.pct==="number"?usage.pct:"";
+  if(a!==r)r.value=usage&&usage.resetAt?toLocalInput(usage.resetAt):"";
+}
+function saveUsage(){
+  var raw=$("#u-pct").value,rs=$("#u-reset").value;
+  var pct=raw===""?null:Math.min(100,Math.max(0,Math.round(Number(raw))));
+  var at=rs?new Date(rs).getTime():null;
+  var data={pct:isNaN(pct)?null:pct,resetAt:at&&!isNaN(at)?at:null,updatedAt:Date.now()};
+  usage=data;syncUsageInputs();tickUsage();
+  if(!db)return;
+  usageQ=usageQ.then(function(){return db.doc("settings/usage").set(data)}).catch(function(){toast("Could not save usage.")});
+}
+$("#u-pct").addEventListener("change",saveUsage);
+$("#u-reset").addEventListener("change",saveUsage);
+setInterval(tickUsage,30000);
+
+
+/* ---------- local storage backend (replaces the claude.ai database) ---------- */
+var SEED={
+ "family-planner":{name:"Family Planner",kind:"app",status:"live",order:1,chatUrl:"",summary:"Family meal planning web app on Netlify with Supabase, installable as a PWA. Weekly planner, recipe library, shopping list and nutrition tracking. Google sign-in with an allow-list, Gemini recipe import, USDA lookup, recipe photos in Supabase Storage and a nightly backup are all in place.",nextSteps:[{id:"fp1",text:"Keep the recipe export readable by Ricettario",done:false}],notes:[]},
+ "ricettario":{name:"Ricettario",kind:"app",status:"live",order:2,chatUrl:"",summary:"Simple Italian recipe app for another family: recipes and servings scaling only, no nutrition or planning. Own Supabase project and Netlify site, no sign-in. It has to import recipe files exported from the Family Planner.",nextSteps:[{id:"ri1",text:"Check that an exported Family Planner recipe file imports correctly",done:false},{id:"ri2",text:"Check that the whole app is in Italian",done:false}],notes:[]},
+ "yoga-class-planner":{name:"Yoga class planner",kind:"app",status:"building",order:3,chatUrl:"",summary:"Personal Tummee-style tool for planning your yoga classes. Drawn SVG pose figures first (about 50 poses), as a website app so later changes update it. Class building is the priority.",nextSteps:[{id:"yo1",text:"Build the class builder",done:false},{id:"yo2",text:"Draw the first set of about 50 SVG pose figures",done:false},{id:"yo3",text:"Put it on a website so changes update the live version",done:false}],notes:[]},
+ "lesson-board":{name:"Lesson tracking board",kind:"tool",status:"building",order:4,chatUrl:"",summary:"Shared web board to follow each lesson video through recording, editing, review and storage. Steps run in a fixed order with owners, due dates, done-by stamps and Drive/YouTube links. Test on localhost first, then host on Netlify.",nextSteps:[{id:"lb1",text:"Test the board on localhost",done:false},{id:"lb2",text:"Host it on Netlify",done:false},{id:"lb3",text:"Try audio-only samples for automatic start and end trimming",done:false}],notes:[]},
+ "kagebana":{name:"Kagebana",kind:"game",status:"planning",order:5,chatUrl:"",summary:"Hades-style isometric action roguelike set in Sengoku-era Japan. About 20 minute runs across three biomes, a few weapons with random boons, parry timing windows, and Steam Deck as the target. Gameplay only, built slowly with no rush.",nextSteps:[{id:"ka1",text:"Decide how the first playable room gets built",done:false},{id:"ka2",text:"Prototype combat with good and perfect parry timing",done:false}],notes:[]},
+ "lifeframe":{name:"LifeFrame",kind:"app",status:"review",order:6,chatUrl:"",summary:"Photography e-commerce platform built with React and Supabase. Not much recorded about where it stands, so set the real status here.",nextSteps:[{id:"lf1",text:"Write down where LifeFrame stands and what comes next",done:false}],notes:[]},
+ "room-repaint":{name:"Room repaint",kind:"home",status:"planning",order:7,chatUrl:"",summary:"Two pink shades split by a wavy line, no white paint, plus white daisy stickers on the upper part of the long wall only. Swatches considered: Brut Rosé R48B, Rose Sugar R45C, Tutu R45B.",nextSteps:[{id:"rr1",text:"Choose the two pinks",done:false},{id:"rr2",text:"Order the white daisy stickers",done:false}],notes:[]}
+};
+function localDb(){
+  var KEY="control-room-v1",mem=null,subs=[];
+  function load(){
+    if(mem)return mem;
+    try{var r=localStorage.getItem(KEY);if(r)mem=JSON.parse(r)}catch(e){}
+    if(!mem){mem={};Object.keys(SEED).forEach(function(k){mem["projects/"+k]=Object.assign({updatedAt:Date.now()},SEED[k])})}
+    return mem;
+  }
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify(mem))}catch(e){}subs.forEach(function(f){f()})}
+  function snap(path){var d=load()[path];return{id:path.split("/").pop(),exists:!!d,data:function(){return d}}}
+  return{
+    doc:function(path){return{
+      set:function(d){load()[path]=d;persist();return Promise.resolve()},
+      update:function(d){var m=load();m[path]=Object.assign({},m[path]||{},d);persist();return Promise.resolve()},
+      delete:function(){delete load()[path];persist();return Promise.resolve()},
+      onSnapshot:function(next){var f=function(){next(snap(path))};subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}
+    }},
+    collection:function(name){return{onSnapshot:function(next){
+      var f=function(){var m=load(),docs=Object.keys(m).filter(function(k){return k.indexOf(name+"/")===0&&k.split("/").length===2}).map(snap);next({docs:docs})};
+      subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}}}
+  };
+}
+
+/* ---------- boot ---------- */
+render(true);
+(async function(){
+  db=localDb();
+  if(!db){loaded=true;dbMissing=true;render(true);return}
+  $("#usage").hidden=false;
+  if(!canWrite)$("#usage").querySelectorAll(".w").forEach(function(el){el.disabled=true});
+  tickUsage();
+  db.doc("settings/usage").onSnapshot(function(s){
+    usage=s.exists?s.data():null;syncUsageInputs();tickUsage();
+  },function(){});
+  db.collection("projects").onSnapshot(function(snap){
+    var m=new Map();snap.docs.forEach(function(d){if(d.exists)m.set(d.id,d.data())});
+    projects=m;loaded=true;render(false);
+  },function(err){
+    loaded=true;
+    if(err&&err.code!=="revoked")toast("Live updates stopped. Reload the page.");
+    render(false);
+  });
+})();
+})();
+</script>
+</body>
+</html>
