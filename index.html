@@ -201,7 +201,7 @@ var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs r
 var KINDS={app:"App",game:"Game",tool:"Tool",home:"Home",work:"Work",other:"Project"};
 var $=function(s){return document.querySelector(s)};
 var db=null,canWrite=true,loaded=false,dbMissing=false;
-var APP_VERSION="1.3.2";
+var APP_VERSION="1.3.3";
 var projects=new Map(),selected=null,open=false,lastRow=null,filter="all",armedDelete=false,drafts={},fallbackText="";
 var queues=new Map();
 
@@ -432,7 +432,7 @@ document.addEventListener("keydown",function(e){
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   }
 });
-var ver=$("#ver");ver.append("Control Room v"+APP_VERSION+" · ");ver.append(h("a",{href:"https://github.com/lucaferioli95/control-room/blob/main/CHANGELOG.md",target:"_blank",rel:"noopener noreferrer",text:"What changed"}));
+var ver=$("#ver");ver.append("Control Room v"+APP_VERSION+" · ");ver.append(h("a",{href:"https://github.com/lucaferioli95/control-room/blob/main/CHANGELOG.md",target:"_blank",rel:"noopener noreferrer",text:"What changed"}));ver.append(" · ",h("span",{id:"hostNote"}));
 
 /* ---------- add project ---------- */
 function showAdd(){var f=$("#addform");f.hidden=false;$("#newname").focus()}

@@ -2,6 +2,9 @@
 
 All notable changes to the Control Room, newest first. The version number is also shown at the bottom of the app.
 
+## 1.3.3 - 2026-10-27
+- Small note next to the version showing where the app is hosted (Cloudflare or GitHub Pages), so you can tell the copies apart.
+
 ## 1.3.2 - 2026-10-27
 - Now also hosted on Cloudflare at its own web address (control-room.luca-ferioli95.workers.dev), so it no longer shares a web address with other apps. Install it fresh from the new address.
 - App identity set for the new address.
