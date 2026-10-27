@@ -175,8 +175,6 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
     <span class="u-text" id="u-text"></span>
     <label class="u-field">Resets at<input id="u-reset" class="w" type="time"></label>
     <button class="btn w" id="u-clear" type="button" hidden>Clear</button>
-    <button class="btn" id="u-notify" type="button" hidden>Notify me on this device</button>
-    <button class="btn" id="u-test" type="button" hidden>Send test</button>
     <span class="u-text" id="u-note"></span>
   </div>
   <nav class="chips" id="chips" aria-label="Filter by status"></nav>
@@ -203,7 +201,7 @@ var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs r
 var KINDS={app:"App",game:"Game",tool:"Tool",home:"Home",work:"Work",other:"Project"};
 var $=function(s){return document.querySelector(s)};
 var db=null,canWrite=true,loaded=false,dbMissing=false;
-var APP_VERSION="1.4.0";
+var APP_VERSION="1.4.1";
 var projects=new Map(),selected=null,open=false,lastRow=null,filter="all",armedDelete=false,drafts={},fallbackText="";
 var queues=new Map();
 
@@ -480,6 +478,7 @@ function saveUsage(clear){
   var data={resetAt:at,updatedAt:Date.now()};
   usage=data;syncUsageInputs();tickUsage();
   if(!db)return;
+  if(at)ensurePush();
   usageQ=usageQ.then(function(){return db.doc("settings/usage").set(data)}).catch(function(){toast("Could not save the reset time.")});
 }
 $("#u-reset").addEventListener("change",function(){saveUsage()});
@@ -490,50 +489,33 @@ setInterval(tickUsage,30000);
 var VAPID_PUBLIC="BKpGwuZOstrggCO5bmck6TxsjjoJeccziwG6tzrfvh7x6rNGgrUgZwB1dLkolbHdZAbeMuVBVygNQIr_-Hd99fI";
 function b64uToBytes(x){var p="=".repeat((4-x.length%4)%4),b=(x+p).replace(/-/g,"+").replace(/_/g,"/"),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
 function pushSupported(){return"serviceWorker"in navigator&&"PushManager"in window&&"Notification"in window&&location.protocol.indexOf("http")===0}
+var ensurePush=function(){};
 function setupPush(sb,email){
-  var nb=$("#u-notify"),tb=$("#u-test"),note=$("#u-note");
+  var note=$("#u-note");
   if(!pushSupported()){
-    note.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)?"On iPhone, install the app to the Home Screen first to get notifications.":"This browser cannot show notifications.";
+    note.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)?"On iPhone, install the app to the Home Screen to get a notification at the reset time.":"";
     return;
   }
-  async function current(){var reg=await navigator.serviceWorker.ready;return{reg:reg,sub:await reg.pushManager.getSubscription()}}
-  async function refresh(){
-    var c=await current(),on=!!c.sub;
-    nb.hidden=false;tb.hidden=!on;
-    nb.textContent=on?"Notifications on (turn off)":"Notify me on this device";
-    note.textContent=!on&&Notification.permission==="denied"?"Notifications are blocked for this site in the browser settings.":"";
-  }
-  nb.addEventListener("click",async function(){
-    nb.disabled=true;
+  var busy=false;
+  /* Called whenever a reset time is set: makes sure this device is subscribed, asking for permission the first time. */
+  ensurePush=async function(){
+    if(busy)return;busy=true;
     try{
-      var c=await current();
-      if(c.sub){
-        var ep=c.sub.endpoint;await c.sub.unsubscribe();
-        await sb.from("control_room_push_subs").delete().eq("endpoint",ep);
-        toast("Notifications turned off on this device.");
-      }else{
+      var reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+      if(!sub){
+        if(Notification.permission==="denied"){note.textContent="Notifications are blocked for this site in the browser settings, so there will be no reminder.";return}
         var perm=await Notification.requestPermission();
-        if(perm!=="granted"){toast("Notifications were not allowed.");await refresh();nb.disabled=false;return}
-        var sub=await c.reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBytes(VAPID_PUBLIC)});
-        var j=sub.toJSON();
-        var r=await sb.from("control_room_push_subs").upsert({endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,email:email},{onConflict:"endpoint"});
-        if(r.error)throw r.error;
-        toast("Notifications on. Sending a test…");
-        await sendTest(sub.endpoint);
+        if(perm!=="granted"){note.textContent="Allow notifications to get a reminder at the reset time.";return}
+        sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBytes(VAPID_PUBLIC)});
       }
-    }catch(e){toast("Could not change notifications: "+(e&&e.message?e.message:"error"))}
-    nb.disabled=false;refresh();
-  });
-  async function sendTest(endpoint){
-    var r=await sb.functions.invoke("reset-notify",{body:{endpoint:endpoint}});
-    if(r.error||!r.data||!r.data.sent){toast("The test message could not be delivered.")}
-  }
-  tb.addEventListener("click",async function(){
-    tb.disabled=true;
-    try{var c=await current();if(c.sub)await sendTest(c.sub.endpoint)}catch(e){toast("The test message could not be sent.")}
-    tb.disabled=false;
-  });
-  refresh();
+      var j=sub.toJSON();
+      var r=await sb.from("control_room_push_subs").upsert({endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,email:email},{onConflict:"endpoint"});
+      if(r.error)throw r.error;
+      note.textContent="";
+    }catch(e){note.textContent="Could not set up the reminder on this device."}
+    finally{busy=false}
+  };
+  if(usage&&usage.resetAt)ensurePush();
 }
 
 

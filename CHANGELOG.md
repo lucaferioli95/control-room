@@ -2,6 +2,9 @@
 
 All notable changes to the Control Room, newest first. The version number is also shown at the bottom of the app.
 
+## 1.4.1 - 2026-10-27
+- Removed the "Notify me" and "Send test" buttons. Setting a reset time now turns on the notification by itself (your phone asks permission the first time), and Clear turns it off.
+
 ## 1.4.0 - 2026-10-27
 - The Claude usage bar is now a simple "Claude reset" time: pick the time it resets today (no date, no percentage).
 - New "Notify me on this device" button: when the reset time arrives, your phone gets a notification, even if the app is closed. Turn it on once per device; "Send test" checks it works.
