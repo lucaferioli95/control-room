@@ -167,7 +167,7 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
       <p class="eyebrow">Luca's workshop</p>
       <h1>Control Room</h1>
     </div>
-    <div class="meta"><div id="meta"></div><button class="btn" id="signout" type="button" hidden style="margin-top:8px">Sign out</button> <button class="btn" id="installbtn" type="button" hidden style="margin-top:8px">Install app</button></div>
+    <div class="meta"><div id="meta"></div><button class="btn" id="signout" type="button" hidden style="margin-top:8px">Sign out</button> <button class="btn" id="installBtn" type="button" hidden style="margin-top:8px">Install app</button></div>
   </header>
   <div id="banner"></div>
   <div class="usage" id="usage" hidden>
@@ -194,13 +194,14 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
 <div id="toast" role="status"></div>
 
 <script src="supabase.js"></script>
+<script src="install.js" defer></script>
 <script>
 (function(){
 var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs review"],["live","Live"],["paused","Paused"],["done","Done"]];
 var KINDS={app:"App",game:"Game",tool:"Tool",home:"Home",work:"Work",other:"Project"};
 var $=function(s){return document.querySelector(s)};
 var db=null,canWrite=true,loaded=false,dbMissing=false;
-var APP_VERSION="1.3.0";
+var APP_VERSION="1.3.1";
 var projects=new Map(),selected=null,open=false,lastRow=null,filter="all",armedDelete=false,drafts={},fallbackText="";
 var queues=new Map();
 
@@ -531,10 +532,7 @@ function showLogin(msg,allowSignIn){
 
 /* ---------- install as app ---------- */
 if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0){navigator.serviceWorker.register("sw.js").catch(function(){})}
-var installEvt=null;
-window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installEvt=e;$("#installbtn").hidden=false});
-window.addEventListener("appinstalled",function(){installEvt=null;$("#installbtn").hidden=true;toast("Installed.")});
-$("#installbtn").addEventListener("click",function(){if(!installEvt)return;installEvt.prompt();installEvt.userChoice.finally(function(){installEvt=null;$("#installbtn").hidden=true})});
+
 
 /* ---------- boot ---------- */
 render(true);

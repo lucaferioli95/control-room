@@ -2,6 +2,9 @@
 
 All notable changes to the Control Room, newest first. The version number is also shown at the bottom of the app.
 
+## 1.3.1 - 2026-10-27
+- The "Install app" button is now always visible (unless the app is already installed). If the browser cannot show its own install prompt, it shows short steps for your browser instead. Shared install.js file used by all my apps.
+
 ## 1.3.0 - 2026-10-25
 - Project details open in a popup (a bottom sheet on phones) instead of pushing the page down. Close with the Close button, Esc, or by tapping outside it.
 - New "App" section on each project: paste the app's web address and use "Open app to install" to open it.
