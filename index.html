@@ -171,11 +171,13 @@ section.block>h3 .count{font-weight:400;letter-spacing:0;text-transform:none;fon
   </header>
   <div id="banner"></div>
   <div class="usage" id="usage" hidden>
-    <span class="u-label">Claude usage</span>
-    <div class="u-meter" aria-hidden="true"><div id="u-fill"></div></div>
+    <span class="u-label">Claude reset</span>
     <span class="u-text" id="u-text"></span>
-    <label class="u-field">Left %<input id="u-pct" class="w" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
-    <label class="u-field">Resets<input id="u-reset" class="w" type="datetime-local"></label>
+    <label class="u-field">Resets at<input id="u-reset" class="w" type="time"></label>
+    <button class="btn w" id="u-clear" type="button" hidden>Clear</button>
+    <button class="btn" id="u-notify" type="button" hidden>Notify me on this device</button>
+    <button class="btn" id="u-test" type="button" hidden>Send test</button>
+    <span class="u-text" id="u-note"></span>
   </div>
   <nav class="chips" id="chips" aria-label="Filter by status"></nav>
   <main class="grid">
@@ -201,7 +203,7 @@ var STATUSES=[["planning","Planning"],["building","Building"],["review","Needs r
 var KINDS={app:"App",game:"Game",tool:"Tool",home:"Home",work:"Work",other:"Project"};
 var $=function(s){return document.querySelector(s)};
 var db=null,canWrite=true,loaded=false,dbMissing=false;
-var APP_VERSION="1.3.3";
+var APP_VERSION="1.4.0";
 var projects=new Map(),selected=null,open=false,lastRow=null,filter="all",armedDelete=false,drafts={},fallbackText="";
 var queues=new Map();
 
@@ -447,42 +449,92 @@ $("#addbtn").addEventListener("click",function(){var f=$("#addform");if(f.hidden
 $("#newok").addEventListener("click",createProject);
 $("#newname").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();createProject()}});
 
-/* ---------- usage marker (typed in by hand; the page cannot read the real balance) ---------- */
+/* ---------- Claude reset time (typed in by hand, always today; a phone notification is sent when it arrives) ---------- */
 var usage=null,usageQ=Promise.resolve();
 function pad2(n){return String(n).padStart(2,"0")}
-function toLocalInput(ts){var d=new Date(ts);return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+"T"+pad2(d.getHours())+":"+pad2(d.getMinutes())}
-function fmtLeft(ms){var m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m"}
+function toTimeInput(ts){var d=new Date(ts);return pad2(d.getHours())+":"+pad2(d.getMinutes())}
+function fmtLeft(ms){var m=Math.max(0,Math.round(ms/60000)),hh=Math.floor(m/60),mm=m%60;return hh?hh+"h "+mm+"m":mm+"m"}
+function sameDay(a,b){return a.toDateString()===b.toDateString()}
 function tickUsage(){
-  var pct=usage&&typeof usage.pct==="number"?usage.pct:null;
-  var at=usage&&usage.resetAt?new Date(usage.resetAt):null;
-  var fill=$("#u-fill");
-  fill.style.width=(pct==null?0:Math.min(100,Math.max(0,pct)))+"%";
-  fill.setAttribute("data-level",pct==null?"":(pct<10?"low":pct<30?"mid":"ok"));
-  var parts=[pct==null?"Credit left not set":pct+"% left"];
+  var at=usage&&usage.resetAt?new Date(usage.resetAt):null,txt;
   if(at&&!isNaN(at.getTime())){
     var ms=at.getTime()-Date.now();
-    parts.push(ms>0?"resets in "+fmtLeft(ms)+" ("+at.toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+")":"reset time has passed, update it");
-  }else parts.push("next reset not set");
-  if(usage&&usage.updatedAt)parts.push("entered "+fmtDate(usage.updatedAt));
-  $("#u-text").textContent=parts.join(" · ");
+    if(ms>0)txt="Resets today at "+toTimeInput(at)+" (in "+fmtLeft(ms)+")";
+    else if(sameDay(at,new Date()))txt="Reset time ("+toTimeInput(at)+") has passed, you can work again";
+    else txt="Reset time not set for today";
+  }else txt="Reset time not set";
+  $("#u-text").textContent=txt;
+  $("#u-clear").hidden=!(at&&!isNaN(at.getTime()));
 }
 function syncUsageInputs(){
-  var a=document.activeElement,p=$("#u-pct"),r=$("#u-reset");
-  if(a!==p)p.value=usage&&typeof usage.pct==="number"?usage.pct:"";
-  if(a!==r)r.value=usage&&usage.resetAt?toLocalInput(usage.resetAt):"";
+  var a=document.activeElement,r=$("#u-reset");
+  if(a!==r)r.value=usage&&usage.resetAt&&sameDay(new Date(usage.resetAt),new Date())?toTimeInput(usage.resetAt):"";
 }
-function saveUsage(){
-  var raw=$("#u-pct").value,rs=$("#u-reset").value;
-  var pct=raw===""?null:Math.min(100,Math.max(0,Math.round(Number(raw))));
-  var at=rs?new Date(rs).getTime():null;
-  var data={pct:isNaN(pct)?null:pct,resetAt:at&&!isNaN(at)?at:null,updatedAt:Date.now()};
+function saveUsage(clear){
+  var t=clear===true?"":$("#u-reset").value,at=null;
+  if(t){
+    var q=t.split(":"),d=new Date();d.setHours(+q[0],+q[1],0,0);
+    if(d.getTime()<=Date.now()){toast("That time has already passed today.");syncUsageInputs();return}
+    at=d.getTime();
+  }
+  var data={resetAt:at,updatedAt:Date.now()};
   usage=data;syncUsageInputs();tickUsage();
   if(!db)return;
-  usageQ=usageQ.then(function(){return db.doc("settings/usage").set(data)}).catch(function(){toast("Could not save usage.")});
+  usageQ=usageQ.then(function(){return db.doc("settings/usage").set(data)}).catch(function(){toast("Could not save the reset time.")});
 }
-$("#u-pct").addEventListener("change",saveUsage);
-$("#u-reset").addEventListener("change",saveUsage);
+$("#u-reset").addEventListener("change",function(){saveUsage()});
+$("#u-clear").addEventListener("click",function(){saveUsage(true)});
 setInterval(tickUsage,30000);
+
+/* ---------- phone notifications (Web Push, sent by a Supabase function when the time arrives) ---------- */
+var VAPID_PUBLIC="BKpGwuZOstrggCO5bmck6TxsjjoJeccziwG6tzrfvh7x6rNGgrUgZwB1dLkolbHdZAbeMuVBVygNQIr_-Hd99fI";
+function b64uToBytes(x){var p="=".repeat((4-x.length%4)%4),b=(x+p).replace(/-/g,"+").replace(/_/g,"/"),r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
+function pushSupported(){return"serviceWorker"in navigator&&"PushManager"in window&&"Notification"in window&&location.protocol.indexOf("http")===0}
+function setupPush(sb,email){
+  var nb=$("#u-notify"),tb=$("#u-test"),note=$("#u-note");
+  if(!pushSupported()){
+    note.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)?"On iPhone, install the app to the Home Screen first to get notifications.":"This browser cannot show notifications.";
+    return;
+  }
+  async function current(){var reg=await navigator.serviceWorker.ready;return{reg:reg,sub:await reg.pushManager.getSubscription()}}
+  async function refresh(){
+    var c=await current(),on=!!c.sub;
+    nb.hidden=false;tb.hidden=!on;
+    nb.textContent=on?"Notifications on (turn off)":"Notify me on this device";
+    note.textContent=!on&&Notification.permission==="denied"?"Notifications are blocked for this site in the browser settings.":"";
+  }
+  nb.addEventListener("click",async function(){
+    nb.disabled=true;
+    try{
+      var c=await current();
+      if(c.sub){
+        var ep=c.sub.endpoint;await c.sub.unsubscribe();
+        await sb.from("control_room_push_subs").delete().eq("endpoint",ep);
+        toast("Notifications turned off on this device.");
+      }else{
+        var perm=await Notification.requestPermission();
+        if(perm!=="granted"){toast("Notifications were not allowed.");await refresh();nb.disabled=false;return}
+        var sub=await c.reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBytes(VAPID_PUBLIC)});
+        var j=sub.toJSON();
+        var r=await sb.from("control_room_push_subs").upsert({endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,email:email},{onConflict:"endpoint"});
+        if(r.error)throw r.error;
+        toast("Notifications on. Sending a test…");
+        await sendTest(sub.endpoint);
+      }
+    }catch(e){toast("Could not change notifications: "+(e&&e.message?e.message:"error"))}
+    nb.disabled=false;refresh();
+  });
+  async function sendTest(endpoint){
+    var r=await sb.functions.invoke("reset-notify",{body:{endpoint:endpoint}});
+    if(r.error||!r.data||!r.data.sent){toast("The test message could not be delivered.")}
+  }
+  tb.addEventListener("click",async function(){
+    tb.disabled=true;
+    try{var c=await current();if(c.sub)await sendTest(c.sub.endpoint)}catch(e){toast("The test message could not be sent.")}
+    tb.disabled=false;
+  });
+  refresh();
+}
 
 
 /* ---------- Supabase backend (shared across devices) ---------- */
@@ -556,6 +608,7 @@ render(true);
   db=supaDb(sb);
   try{await db.start()}catch(e){loaded=true;dbMissing=true;$("#banner").append(h("div",{class:"banner",text:"Could not load your board. Check your connection and reload."}));render(true);return}
   $("#usage").hidden=false;
+  setupPush(sb,sess.user.email);
   if(!canWrite)$("#usage").querySelectorAll(".w").forEach(function(el){el.disabled=true});
   tickUsage();
   db.doc("settings/usage").onSnapshot(function(s){
