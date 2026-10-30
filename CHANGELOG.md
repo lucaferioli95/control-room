@@ -2,6 +2,9 @@
 
 All notable changes to the Control Room, newest first. The version number is also shown at the bottom of the app.
 
+## 1.4.2 - 2026-10-30
+- Once the app is installed, the install button turns into "Uninstall app" and shows how to remove it (browsers do not let a web app remove itself, so it shows the steps).
+
 ## 1.4.1 - 2026-10-27
 - Removed the "Notify me" and "Send test" buttons. Setting a reset time now turns on the notification by itself (your phone asks permission the first time), and Clear turns it off.
 
